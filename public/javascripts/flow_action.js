@@ -3,8 +3,8 @@
  */
 var UTIL = require('util');
 var URL = require('url');
-var http = require('http')
-var https = require('https')
+var http = require('http');
+var https = require('https');
 
 function getHttpModule (protocol) {
     if (protocol == 'https')
@@ -96,8 +96,21 @@ function RequestFetchAction(url, params, options) {
 }
 
 function FileSaveAction(url, params, options) {
+    var fs = require('fs');
     function selfDo() {
-        
+        if (! checkParams(url, options)){
+            return false;
+        }
+
+        fs.writeFile();
+    }
+
+    function checkParams() {
+        if (!url){
+            UTIL.log(`url wrong...${url}, ${options}`);
+            return false;
+        }
+        return true;
     }
 }
 
