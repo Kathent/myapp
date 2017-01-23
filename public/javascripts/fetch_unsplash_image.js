@@ -1,14 +1,43 @@
 const flowAction = require('./flow_action.js');
 console.log(flowAction);
 var af = flowAction.ActionFactory;
+var WorkNode = flowAction.WorkNode;
 
-var requestUrl = 'https://source.unsplash.com/random/50/50';
-var action = af.getAction('rf', requestUrl, '', (allData) => {
-    console.log(allData);
-});
-if (action){
-    action.selfDo();
-}
+var requestUrl = 'https://source.unsplash.com/random';
+args = {url : requestUrl, port:443};
+var firstFetch = af.getAction('rf', args);
+var startNode = Object.create(WorkNode);
+startNode.action = firstFetch;
+
+
+var secondFetch = af.getAction('rf', {encoding: 'binary'});
+var secondNode = Object.create(WorkNode);
+secondNode.action = secondFetch;
+secondNode.action.argsDeal = function (args) {
+    var reg = /href\s*=\s*"(.*)"/;
+    var match = args.data.match(reg);
+    if (match){
+        secondNode.action.args.url = match[1];
+    }
+};
+startNode.next = secondNode;
+
+
+var thirdNode = Object.create(WorkNode);
+var timestamp = new Date().valueOf();
+var args = { url: '../images/'+timestamp+'.jpeg', encoding: 'binary', }
+console.log(args.url);
+var writeAction = af.getAction('fs', args);
+writeAction.argsDeal = function (args) {
+    thirdNode.action.args.data = args.data;
+};
+thirdNode.action = writeAction;
+
+secondNode.next = thirdNode;
+startNode.work();
+
+
+
 
 
 

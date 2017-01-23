@@ -6,39 +6,71 @@ var URL = require('url');
 var http = require('http');
 var https = require('https');
 
+const ACTION_OVER_EVENT = 'actionOver';
+const EventEmitter = require('events');
+
 function getHttpModule (protocol) {
     if (protocol.startsWith('https'))
         return https;
     return http;
 }
 
+var WorkNode = {
+    action: null,
+    next: null,
+    work : function () {
+        if (this.action){
+            this.action.selfDo();
+            this.action.emiter.on(ACTION_OVER_EVENT, (args) =>{
+               if (this.next) {
+                   if (this.next.action){
+                       this.next.action.argsDeal(args);
+                   }
+                   this.next.work()
+               };
+            });
+        }
+    }
+};
+
+
+
+
 var ActionFactory = {
     //reg : /([a-zA-Z]+):\\\\\\(.*)/,
     // parse: function (url) {
     //     return url.match(this.reg);
     // },
-    getAction:function (actionName, url, options, call) {
+    getAction:function (actionName, args) {
         if (actionName == 'rf'){
-            return new RequestFetchAction(url, options, call);
+            return new RequestFetchAction(args);
         }else if (actionName == 'fs'){
-            return new FileSaveAction(url, options, call);
+            return new FileSaveAction(args);
         }
 
-        return new BaseAction(url, options, call);
+        return new BaseAction(args);
     }
 };
 
-function BaseAction(url, options, call) {
-    BaseAction.prototype.selfDo = function () {
-        UTIL.log(url, options, call);
-        return null;
-    }
-};
-
-function RequestFetchAction(url, options, call) {
-    BaseAction.call(this);
+function BaseAction(args) {
+    this.emiter = new EventEmitter();
+    this.args = args;
     this.selfDo = function () {
-        if (!checkParams()){
+        UTIL.log('BaseAction SelfDo....');
+        return null;
+    };
+
+    this.argsDeal= function (args){
+      UTIL.log('args:'+ args);
+    };
+};
+
+function RequestFetchAction(args) {
+    BaseAction.call(this, args);
+    this.selfDo = function () {
+        var url = args.url;
+        var options = args;
+        if (!checkParams(url, options)){
             return null;
         }
 
@@ -48,17 +80,21 @@ function RequestFetchAction(url, options, call) {
         requestOptions.port = parsedUrl.port;
         requestOptions.method = parsedUrl.method;
         requestOptions.path = parsedUrl.path;
-        if (options.encoding) requestOptions.encoding = options.encoding;
+        if (options && options.encoding) requestOptions.encoding = options.encoding;
         var protocol = getHttpModule(parsedUrl.protocol);
 
         var allData = null;
+        var emitter = this.emiter;
         var req = protocol.request(requestOptions, function (res) {
             res.on('data', function (chunk) {
                 allData += chunk;
                 UTIL.log(`chunk size...${chunk.length}`);
             });
 
-            res.on('end', call);
+            res.on('end', () => {
+                UTIL.log('RequestFetchAction end....')
+                emitter.emit(ACTION_OVER_EVENT, {data : allData});
+            });
         });
 
         req.on('error', function (error) {
@@ -67,7 +103,7 @@ function RequestFetchAction(url, options, call) {
         req.end();
     }
 
-    function checkParams() {
+    function checkParams(url, options) {
         if (! url){
             UTIL.log(`url wrong...url: ${url}, options: ${options}`);
             return false;
@@ -87,20 +123,27 @@ function RequestFetchAction(url, options, call) {
     }
 }
 
-function FileSaveAction(url, options, call) {
-    BaseAction.call(this);
+function FileSaveAction(args) {
+    BaseAction.call(this, args);
     var fs = require('fs');
     this.selfDo = function () {
+        UTIL.log('data length...'+args.data.length);
+        var url = args.url;
+        var options = args;
         if (! checkParams(url, options)){
             return false;
         }
 
         var data = options.data;
-        options.delete(options.data);
-        fs.writeFile(url, data, options, call);
+        // options.delete(options.data);
+        delete options.data;
+        fs.writeFile(url, data, options, (error) => {
+            if (error) console.log(error);
+            this.emiter.emit(ACTION_OVER_EVENT, null);
+        });
     }
 
-    function checkParams() {
+    function checkParams(url, options) {
         if (!url){
             UTIL.log(`url wrong...${url}, ${options}`);
             return false;
@@ -114,3 +157,4 @@ function FileSaveAction(url, options, call) {
     }
 }
 exports.ActionFactory = ActionFactory;
+exports.WorkNode = WorkNode;
