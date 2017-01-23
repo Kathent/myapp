@@ -80,19 +80,21 @@ function RequestFetchAction(args) {
         requestOptions.port = parsedUrl.port;
         requestOptions.method = parsedUrl.method;
         requestOptions.path = parsedUrl.path;
-        if (options && options.encoding) requestOptions.encoding = options.encoding;
         var protocol = getHttpModule(parsedUrl.protocol);
 
-        var allData = null;
+        var allData = "";
         var emitter = this.emiter;
         var req = protocol.request(requestOptions, function (res) {
+            // if (args && args.encoding) res.encoding = args.encoding;
+            res.setEncoding('binary');
             res.on('data', function (chunk) {
                 allData += chunk;
                 UTIL.log(`chunk size...${chunk.length}`);
             });
 
             res.on('end', () => {
-                UTIL.log('RequestFetchAction end....')
+                var printData = allData.substr(0, 4);
+                UTIL.log('RequestFetchAction end....data:'+printData);
                 emitter.emit(ACTION_OVER_EVENT, {data : allData});
             });
         });
@@ -135,9 +137,8 @@ function FileSaveAction(args) {
         }
 
         var data = options.data;
-        // options.delete(options.data);
-        delete options.data;
-        fs.writeFile(url, data, options, (error) => {
+        var fileOptions = options.encoding;
+        fs.writeFile(url, data, fileOptions, (error) => {
             if (error) console.log(error);
             this.emiter.emit(ACTION_OVER_EVENT, null);
         });

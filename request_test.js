@@ -29,7 +29,7 @@ var req = https.request(options, function(res){
     });
 
     res.on('end', function(){
-        fs.writeFile('a.jpeg', messages, 'binary', (err) => {
+        fs.writeFile('a.jpg', messages, 'binary', function(err)  {
             if (err) {
                 util.log('error...');
             }
