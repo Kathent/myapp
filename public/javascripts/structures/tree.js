@@ -1,7 +1,9 @@
 /**
  * Created by liangkj on 2017/2/8.
  */
-var UTIL = rere('util');
+var UTIL = require('util');
+var StrategyFactory = new BTTreeVisitStrategyFactory();
+var VisitFactory = new NodeVisitElementFactory();
 
 function BTNode(){
     this.data = null;
@@ -24,30 +26,63 @@ function BTNode(){
         this.right = null;
         return before;
     };
-    this.visit = function () {
-        console.log('visit node now..data:'+ this.data);
+    this.visit = function (call) {
+        call(this);
     }
     this.isLeaf = function () {
-        return this.left == null || this.right == null;
+        return this.left == null && this.right == null;
     }
 };
 
 function BTTree(root) {
     this.root = root;
     this.visitWithType = function (type) {
-        var strategy = BTTreeVisitStrategyFactory.getStrategyByType(type);
-        strategy.visit(this);
+        var strategy = StrategyFactory.getStrategyByType(type);
+        strategy.visit(this, null);
     };
+    this.visitWithTypeCallable = function (type, call) {
+        StrategyFactory.getStrategyByType(type).visit(this, call);
+    }
 
     this.subTree = function (root) {
         return new BTTree(root);
     }
+    this.addedNodes = function (nodes) {
+        for (var i = 0; i < nodes.length; i++){
+            var node = nodes[i];
+            this.addNode(node);
+        }
+    }
+    this.addNode = function (node) {
+        var isLeft = Math.random() * 2 < 1;
+        if (isLeft){
+            if (root.left == null){
+                root.left = node;
+            }else {
+                this.subTree(root.left).addNode(node);
+            }
+        }else {
+            if (root.right == null){
+                root.right = node;
+            }else {
+                this.subTree(root.right).addNode(node);
+            }
+        }
+    }
+    this.addDatas = function (datas) {
+        for (var i = 0; i < datas.length; i++){
+            var data = datas[i];
+            var realNode = new BTNode();
+            realNode.data = data;
+            this.addNode(realNode);
+        }
+    }
 }
 
-var BTTreeVisitStrategyFactory = function () {
-    const VISIT_TYPE_0 = 0;
-    const VISIT_TYPE_1 = 1;
-    const VISIT_TYPE_2 = 2;
+function BTTreeVisitStrategyFactory() {
+    this.VISIT_TYPE_0 = 0;
+    this.VISIT_TYPE_1 = 1;
+    this.VISIT_TYPE_2 = 2;
 
     var preOrderList = [0,1,2];
     var midOrderList = [1,0,2];
@@ -55,27 +90,27 @@ var BTTreeVisitStrategyFactory = function () {
 
     const orderListArray = new Array(preOrderList, midOrderList, postOrderList);
 
-    var preOrder = new PreOrderVisitStrategy(orderListArray[VISIT_TYPE_0]);
-    var midOrder = new MidOrderVisitStrategy(orderListArray[VISIT_TYPE_1]);
-    var postOrder = new PostOrderVisitStrategy(orderListArray[VISIT_TYPE_2]);
+    var preOrder = new PreOrderVisitStrategy(orderListArray[this.VISIT_TYPE_0]);
+    var midOrder = new MidOrderVisitStrategy(orderListArray[this.VISIT_TYPE_1]);
+    var postOrder = new PostOrderVisitStrategy(orderListArray[this.VISIT_TYPE_2]);
     const typeToStrategy = new Array(preOrder, midOrder, postOrder);
 
-    function getStrategyByType(type) {
-        if (type < VISIT_TYPE_0 || type > VISIT_TYPE_2){
+    this.getStrategyByType = function(type) {
+        if (type < this.VISIT_TYPE_0 || type > this.VISIT_TYPE_2){
             throw new RangeError('type out of range..type:'+type);
         }
         return typeToStrategy[type];
     }
 }
 
-var NodeVisitElementFactory = function () {
-    const VISIT_MID_NODE = 0;
-    const VISIT_LEFT_NODE = 1;
-    const VISIT_RIGHT_NODE = 2;
+function NodeVisitElementFactory() {
+    this.VISIT_MID_NODE = 0;
+    this.VISIT_LEFT_NODE = 1;
+    this.VISIT_RIGHT_NODE = 2;
     const array = new Array(new MidVisitElement(), new LeftVisitElement(), new RightVisitElement());
 
-    this.getElementByType = function (type) {
-        if (type < VISIT_MID_NODE || type > VISIT_RIGHT_NODE){
+    this.getElementByVisitType = function (type) {
+        if (type < this.VISIT_MID_NODE || type > this.VISIT_RIGHT_NODE){
             throw new RangeError('type out of range..type:'+type);
         }
         return array[type];
@@ -87,12 +122,11 @@ function NodeVisitElement() {
 
     };
 
-    this.elementVisit = function (node, strategy) {
+    this.elementVisit = function (node, strategy, call) {
         if (node.isLeaf()){
-            node.visit();
+            node.visit(call);
         }else if (node != null){
-            strategy.visit(new BTTree(node));
-            node.visit();
+            strategy.visit(new BTTree(node), call);
         }
     }
 }
@@ -107,6 +141,9 @@ function MidVisitElement() {
     this.getNode = function (tree) {
         return tree.root;
     }
+    this.elementVisit= function(node, strategy, call){
+        node.visit(call);
+    }
 }
 function RightVisitElement() {
     NodeVisitElement.call(this);
@@ -116,11 +153,13 @@ function RightVisitElement() {
 }
 function VisitStrategy(visitList) {
     this.visitList = visitList;
-    this.visit = function (tree) {
-        for (var x in this.visitList){
-            var ele = NodeVisitElementFactory.getElementByType(x);
+    this.visit = function (tree, call) {
+        for (var i = 0; i < this.visitList.length; i++){
+            var ele = VisitFactory.getElementByVisitType(this.visitList[i]);
             var node = ele.getNode(tree);
-            ele.elementVisit(node, this);
+            if (node != null){
+                ele.elementVisit(node, this, call);
+            }
         }
     }
 }
@@ -134,3 +173,14 @@ function MidOrderVisitStrategy(visitList) {
 function PostOrderVisitStrategy(visitList) {
     VisitStrategy.call(this, visitList);
 }
+
+var root = new BTNode();
+root.data = 0;
+var tree = new BTTree(root);
+tree.addDatas([1,2,3,4,5,6,7]);
+var printNode = function (node) {
+    console.log('visit node..data:'+node.data);
+}
+tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_0, printNode);
+tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_1, printNode);
+tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_2, printNode);
