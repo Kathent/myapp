@@ -1,14 +1,15 @@
 /**
  * Created by liangkj on 2017/2/8.
  */
-var UTIL = require('util');
 var StrategyFactory = new BTTreeVisitStrategyFactory();
 var VisitFactory = new NodeVisitElementFactory();
 
 function BTNode(){
     this.data = null;
     this.left = null;
-    this.right = null,
+    this.right = null;
+    this.parent = null;
+    this.height = 0;
 
     this.addLeft = function (node) {
         this.left = node;
@@ -32,10 +33,14 @@ function BTNode(){
     this.isLeaf = function () {
         return this.left == null && this.right == null;
     }
+    this.placeNode = function (parent) {
+        this.parent = parent;
+        this.height = parent.height + 1;
+    }
 };
 
-function BTTree(root) {
-    this.root = root;
+function BTTree(r) {
+    this.root = r;
     this.visitWithType = function (type) {
         var strategy = StrategyFactory.getStrategyByType(type);
         strategy.visit(this, null);
@@ -45,7 +50,7 @@ function BTTree(root) {
     }
 
     this.subTree = function (root) {
-        return new BTTree(root);
+        return new this.constructor(root);
     }
     this.addedNodes = function (nodes) {
         for (var i = 0; i < nodes.length; i++){
@@ -54,18 +59,20 @@ function BTTree(root) {
         }
     }
     this.addNode = function (node) {
-        var isLeft = Math.random() * 2 < 1;
+        var isLeft = this.addToLeft(this.root, node);
         if (isLeft){
-            if (root.left == null){
-                root.left = node;
+            if (this.root.left == null){
+                this.root.left = node;
+                node.placeNode(this.root);
             }else {
-                this.subTree(root.left).addNode(node);
+                this.subTree(this.root.left).addNode(node);
             }
         }else {
-            if (root.right == null){
-                root.right = node;
+            if (this.root.right == null){
+                this.root.right = node;
+                node.placeNode(this.root);
             }else {
-                this.subTree(root.right).addNode(node);
+                this.subTree(this.root.right).addNode(node);
             }
         }
     }
@@ -76,6 +83,9 @@ function BTTree(root) {
             realNode.data = data;
             this.addNode(realNode);
         }
+    }
+    this.addToLeft = function (node1, node2) {
+        return Math.random() * 2 < 1;
     }
 }
 
@@ -174,13 +184,25 @@ function PostOrderVisitStrategy(visitList) {
     VisitStrategy.call(this, visitList);
 }
 
+function BSTree(root) {
+    BTTree.call(this, root);
+    this.addToLeft = function (node1, node2) {
+        if (node2.data < node1.data){
+            return true;
+        }
+        return false;
+    }
+}
+
 var root = new BTNode();
 root.data = 0;
-var tree = new BTTree(root);
+var tree = new BSTree(root);
 tree.addDatas([1,2,3,4,5,6,7]);
 var printNode = function (node) {
-    console.log('visit node..data:'+node.data);
+    var parent = node.parent;
+    var parentData = parent == null || parent == undefined ? -1 : parent.data;
+    console.log('visit node..data:'+node.data+' height:'+node.height+ 'parent data:'+parentData);
 }
 tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_0, printNode);
-tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_1, printNode);
-tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_2, printNode);
+//tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_1, printNode);
+//tree.visitWithTypeCallable(StrategyFactory.VISIT_TYPE_2, printNode);
